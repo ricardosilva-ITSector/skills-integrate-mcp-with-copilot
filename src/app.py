@@ -5,17 +5,34 @@ A super simple FastAPI application that allows students to view and sign up
 for extracurricular activities at Mergington High School.
 """
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel, EmailStr
+from passlib.context import CryptContext
+from jose import JWTError, jwt
+from datetime import datetime, timedelta
 import os
 from pathlib import Path
 from contextlib import asynccontextmanager
+from typing import Optional
 
-from database import init_db, get_session, seed_initial_data, Activity, Participant
+from database import init_db, get_session, seed_initial_data, Activity, Participant, User, UserRole
+
+
+# JWT Configuration
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# OAuth2 scheme
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
 # Pydantic models for request/response
@@ -30,6 +47,99 @@ class ActivityUpdate(BaseModel):
     description: str | None = None
     schedule: str | None = None
     max_participants: int | None = None
+
+
+class UserRegister(BaseModel):
+    username: str
+    email: EmailStr
+    password: str
+    role: UserRole = UserRole.STUDENT
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
+    role: Optional[UserRole] = None
+
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    email: str
+    role: UserRole
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# Authentication helper functions
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a password against its hash"""
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_password_hash(password: str) -> str:
+    """Hash a password"""
+    return pwd_context.hash(password)
+
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """Create a JWT access token"""
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    session: AsyncSession = Depends(get_session)
+) -> User:
+    """Get the current authenticated user from JWT token"""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        role: str = payload.get("role")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username, role=UserRole(role) if role else None)
+    except JWTError:
+        raise credentials_exception
+    
+    # Get user from database
+    result = await session.execute(
+        select(User).where(User.username == token_data.username)
+    )
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise credentials_exception
+    return user
+
+
+def require_role(*allowed_roles: UserRole):
+    """Dependency to check if user has required role"""
+    async def role_checker(current_user: User = Depends(get_current_user)) -> User:
+        if current_user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not enough permissions"
+            )
+        return current_user
+    return role_checker
 
 
 @asynccontextmanager
@@ -56,6 +166,95 @@ app.mount("/static", StaticFiles(directory=os.path.join(Path(__file__).parent,
 @app.get("/")
 def root():
     return RedirectResponse(url="/static/index.html")
+
+
+# Authentication endpoints
+
+@app.post("/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def register(
+    user_data: UserRegister,
+    session: AsyncSession = Depends(get_session)
+):
+    """Register a new user"""
+    # Check if username already exists
+    result = await session.execute(
+        select(User).where(User.username == user_data.username)
+    )
+    if result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already registered"
+        )
+    
+    # Check if email already exists
+    result = await session.execute(
+        select(User).where(User.email == user_data.email)
+    )
+    if result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+    
+    # Create new user
+    new_user = User(
+        username=user_data.username,
+        email=user_data.email,
+        hashed_password=get_password_hash(user_data.password),
+        role=user_data.role
+    )
+    session.add(new_user)
+    await session.commit()
+    await session.refresh(new_user)
+    
+    return new_user
+
+
+@app.post("/auth/login", response_model=Token)
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    session: AsyncSession = Depends(get_session)
+):
+    """Login and receive JWT token"""
+    # Find user by username
+    result = await session.execute(
+        select(User).where(User.username == form_data.username)
+    )
+    user = result.scalar_one_or_none()
+    
+    # Verify credentials
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Create access token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username, "role": user.role.value},
+        expires_delta=access_token_expires
+    )
+    
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@app.get("/auth/me", response_model=UserResponse)
+async def get_current_user_info(current_user: User = Depends(get_current_user)):
+    """Get current authenticated user information"""
+    return current_user
+
+
+@app.post("/auth/refresh", response_model=Token)
+async def refresh_token(current_user: User = Depends(get_current_user)):
+    """Refresh JWT token"""
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": current_user.username, "role": current_user.role.value},
+        expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @app.get("/activities")
@@ -167,7 +366,8 @@ async def unregister_from_activity(
 @app.post("/admin/activities")
 async def create_activity(
     activity: ActivityCreate,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.ACTIVITY_ADMIN))
 ):
     """Create a new activity (Admin only)"""
     # Check if activity already exists
@@ -208,7 +408,8 @@ async def create_activity(
 async def update_activity(
     activity_name: str,
     activity_update: ActivityUpdate,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.ACTIVITY_ADMIN))
 ):
     """Update an existing activity (Admin only)"""
     # Find the activity
@@ -245,7 +446,8 @@ async def update_activity(
 @app.delete("/admin/activities/{activity_name}")
 async def delete_activity(
     activity_name: str,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_role(UserRole.ADMIN, UserRole.ACTIVITY_ADMIN))
 ):
     """Delete an activity (Admin only)"""
     # Find the activity

@@ -2,11 +2,13 @@
 Database configuration and models for the High School Management System
 """
 
-from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey, DateTime, Enum as SQLEnum
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base as async_declarative_base
+from datetime import datetime
+import enum
 import os
 
 # Database URL - using SQLite for simplicity
@@ -21,6 +23,25 @@ async_session = sessionmaker(
 )
 
 Base = async_declarative_base()
+
+
+class UserRole(str, enum.Enum):
+    """User role enumeration for RBAC"""
+    ADMIN = "ADMIN"
+    ACTIVITY_ADMIN = "ACTIVITY_ADMIN"
+    STUDENT = "STUDENT"
+
+
+class User(Base):
+    """User model for authentication and authorization"""
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(50), unique=True, nullable=False, index=True)
+    email = Column(String(100), unique=True, nullable=False, index=True)
+    hashed_password = Column(String(100), nullable=False)
+    role = Column(SQLEnum(UserRole), nullable=False, default=UserRole.STUDENT)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 class Activity(Base):
@@ -62,7 +83,11 @@ async def get_session() -> AsyncSession:
 
 
 async def seed_initial_data():
-    """Seed the database with initial activity data"""
+    """Seed the database with initial activity data and default admin user"""
+    from passlib.context import CryptContext
+    
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    
     async with async_session() as session:
         # Check if data already exists
         from sqlalchemy import select
@@ -71,6 +96,35 @@ async def seed_initial_data():
         
         if existing:
             return  # Data already seeded
+        
+        # Create default admin user
+        admin_user = User(
+            username="admin",
+            email="admin@mergington.edu",
+            hashed_password=pwd_context.hash("admin123"),
+            role=UserRole.ADMIN
+        )
+        session.add(admin_user)
+        
+        # Create a sample activity admin user
+        activity_admin = User(
+            username="coordinator",
+            email="coordinator@mergington.edu",
+            hashed_password=pwd_context.hash("coordinator123"),
+            role=UserRole.ACTIVITY_ADMIN
+        )
+        session.add(activity_admin)
+        
+        # Create a sample student user
+        student = User(
+            username="student",
+            email="student@mergington.edu",
+            hashed_password=pwd_context.hash("student123"),
+            role=UserRole.STUDENT
+        )
+        session.add(student)
+        
+        await session.flush()  # Commit users first
         
         # Initial activities data
         initial_activities = [
