@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Dashboard - Mergington High School</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Mergington High School</h1>
+      <h2>Admin Dashboard</h2>
+      <nav class="admin-nav">
+        <a href="/static/index.html">View Student Portal</a>
+      </nav>
+    </header>
+
+    <main class="admin-main">
+      <!-- Create New Activity Section -->
+      <section id="create-activity-section" class="admin-section">
+        <h3>Create New Activity</h3>
+        <form id="create-activity-form" class="admin-form">
+          <div class="form-group">
+            <label for="new-activity-name">Activity Name:</label>
+            <input type="text" id="new-activity-name" required placeholder="e.g., Robotics Club" />
+          </div>
+          <div class="form-group">
+            <label for="new-activity-description">Description:</label>
+            <textarea id="new-activity-description" required rows="3" placeholder="Describe the activity..."></textarea>
+          </div>
+          <div class="form-group">
+            <label for="new-activity-schedule">Schedule:</label>
+            <input type="text" id="new-activity-schedule" required placeholder="e.g., Mondays, 3:30 PM - 5:00 PM" />
+          </div>
+          <div class="form-group">
+            <label for="new-activity-max">Max Participants:</label>
+            <input type="number" id="new-activity-max" required min="1" placeholder="e.g., 15" />
+          </div>
+          <button type="submit" class="btn-primary">Create Activity</button>
+        </form>
+        <div id="create-message" class="hidden"></div>
+      </section>
+
+      <!-- Manage Existing Activities Section -->
+      <section id="manage-activities-section" class="admin-section">
+        <h3>Manage Existing Activities</h3>
+        <div id="admin-activities-list">
+          <p>Loading activities...</p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>&copy; 2023 Mergington High School - Admin Dashboard</p>
+    </footer>
+
+    <script src="admin.js"></script>
+  </body>
+</html>

@@ -198,3 +198,198 @@ footer {
   padding: 20px;
   color: #666;
 }
+
+/* Admin Dashboard Styles */
+
+.admin-nav {
+  margin-top: 15px;
+}
+
+.admin-nav a {
+  color: white;
+  text-decoration: none;
+  padding: 8px 16px;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.admin-nav a:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.admin-main {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  align-items: center;
+}
+
+.admin-section {
+  width: 100%;
+  max-width: 900px;
+}
+
+.admin-form {
+  background-color: #f9f9f9;
+  padding: 20px;
+  border-radius: 5px;
+  margin-bottom: 15px;
+}
+
+.admin-form textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 16px;
+  font-family: Arial, sans-serif;
+  resize: vertical;
+}
+
+.admin-activity-card {
+  margin-bottom: 20px;
+  padding: 20px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  background-color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.activity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #1a237e;
+}
+
+.activity-header h4 {
+  margin: 0;
+  color: #1a237e;
+  font-size: 22px;
+}
+
+.activity-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-edit,
+.btn-delete,
+.btn-primary,
+.btn-cancel {
+  padding: 8px 16px;
+  font-size: 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.btn-edit {
+  background-color: #2196f3;
+  color: white;
+}
+
+.btn-edit:hover {
+  background-color: #1976d2;
+}
+
+.btn-delete {
+  background-color: #f44336;
+  color: white;
+}
+
+.btn-delete:hover {
+  background-color: #d32f2f;
+}
+
+.btn-primary {
+  background-color: #4caf50;
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #45a049;
+}
+
+.btn-cancel {
+  background-color: #9e9e9e;
+  color: white;
+}
+
+.btn-cancel:hover {
+  background-color: #757575;
+}
+
+.activity-details {
+  margin-bottom: 15px;
+}
+
+.activity-details p {
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.edit-form {
+  margin-top: 20px;
+  padding: 20px;
+  background-color: #e3f2fd;
+  border-radius: 5px;
+  border: 1px solid #1976d2;
+}
+
+.edit-form h5 {
+  margin-bottom: 15px;
+  color: #1976d2;
+}
+
+.edit-form .form-group {
+  margin-bottom: 15px;
+}
+
+.edit-form label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+  color: #333;
+}
+
+.edit-form input,
+.edit-form textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.edit-message {
+  margin-top: 10px;
+}
+
+/* Responsive design for admin */
+@media (max-width: 768px) {
+  .activity-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .activity-actions {
+    margin-top: 10px;
+    width: 100%;
+  }
+
+  .activity-actions button {
+    flex: 1;
+  }
+}
+
